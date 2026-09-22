@@ -1,0 +1,16 @@
+aws_region  = "ap-south-1"
+project_name = "ai-job-intelligence"
+environment  = "production"
+
+vpc_cidr = "10.0.0.0/16"
+
+availability_zones = [
+  "ap-south-1a",
+  "ap-south-1b"
+]
+
+ec2_instance_type = "t3.micro"
+
+database_password = "your-strong-password"
+
+admin_cidr = "157.51.220.134/32"

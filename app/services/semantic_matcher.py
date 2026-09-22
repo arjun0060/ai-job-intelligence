@@ -103,7 +103,9 @@ class SemanticMatcher:
                 preferred_requirements=
                     job_requirements[
                         "preferred_requirements"
-                    ]
+                    ],
+
+                retrieved_evidence={}
             )
         )
 

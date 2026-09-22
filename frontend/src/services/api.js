@@ -1,7 +1,9 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/v1",
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://127.0.0.1:8000/api/v1",
 });
 
 api.interceptors.request.use(
@@ -112,11 +114,7 @@ export const analyzeMatch = async (
   jobId
 ) => {
   const response = await api.post(
-    "/matches/analyze",
-    {
-      resume_id: resumeId,
-      job_id: jobId,
-    }
+    `/matches/${resumeId}/${jobId}`
   );
 
   return response.data;

@@ -6,9 +6,8 @@ from google import genai
 from app.core.config import settings
 from app.core.exceptions import (
     AIServiceError,
-    AIResponseParsingError
+    AIResponseParsingError,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,6 @@ logger = logging.getLogger(__name__)
 class GeminiMatchAnalyzer:
 
     def __init__(self):
-
         self.client = genai.Client(
             api_key=settings.GEMINI_API_KEY
         )
@@ -29,6 +27,7 @@ class GeminiMatchAnalyzer:
         self,
         resume_data: dict,
         job_data: dict,
+        retrieved_evidence: dict | None = None,
     ) -> dict:
 
         # ---------------------------------------------
@@ -62,21 +61,18 @@ class GeminiMatchAnalyzer:
                 resume_data.get("skills")
                 or []
             ),
-
             "experience": (
                 resume_data.get("experience")
                 or []
             ),
-
             "education": (
                 resume_data.get("education")
                 or []
             ),
-
             "summary": (
                 resume_data.get("summary")
                 or ""
-            )
+            ),
         }
 
         # ---------------------------------------------
@@ -86,15 +82,10 @@ class GeminiMatchAnalyzer:
         analysis_result = (
             self.analyze_semantic_match(
                 candidate_profile=candidate_profile,
-
-                required_requirements=
-                required_requirements,
-
-                technology_requirements=
-                technology_requirements,
-
-                preferred_requirements=
-                preferred_requirements
+                required_requirements=required_requirements,
+                technology_requirements=technology_requirements,
+                preferred_requirements=preferred_requirements,
+                retrieved_evidence=retrieved_evidence or {},
             )
         )
 
@@ -105,20 +96,13 @@ class GeminiMatchAnalyzer:
         analysis_result = (
             self._normalize_analysis_result(
                 analysis_result=analysis_result,
-
-                required_requirements=
-                required_requirements,
-
-                technology_requirements=
-                technology_requirements,
-
-                preferred_requirements=
-                preferred_requirements
+                required_requirements=required_requirements,
+                technology_requirements=technology_requirements,
+                preferred_requirements=preferred_requirements,
             )
         )
 
         return analysis_result
-
 
     # =========================================================
     # BUILD REQUIRED REQUIREMENTS
@@ -151,12 +135,10 @@ class GeminiMatchAnalyzer:
                     requirements.append(
                         {
                             "requirement": requirement,
-
                             "category": item.get(
                                 "category",
                                 "technical"
                             ),
-
                             "importance": item.get(
                                 "importance",
                                 "high"
@@ -169,10 +151,56 @@ class GeminiMatchAnalyzer:
                 requirements.append(
                     {
                         "requirement": item,
-
                         "category": "technical",
-
                         "importance": "high"
+                    }
+                )
+
+        # ---------------------------------------------
+        # Experience requirement
+        # ---------------------------------------------
+
+        experience_requirement = (
+            job_data.get("experience_requirement")
+            or {}
+        )
+        experience_text = self._experience_text(
+            experience_requirement
+        )
+
+        if experience_text:
+            requirements.append(
+                {
+                    "requirement": experience_text,
+                    "category": "experience",
+                    "importance": "high",
+                }
+            )
+
+        # ---------------------------------------------
+        # Education requirements
+        # ---------------------------------------------
+
+        for item in (
+            job_data.get("education_requirements")
+            or []
+        ):
+            requirement = (
+                item.get("requirement")
+                if isinstance(item, dict)
+                else item
+            )
+
+            if requirement:
+                requirements.append(
+                    {
+                        "requirement": str(requirement),
+                        "category": "education",
+                        "importance": (
+                            item.get("importance", "medium")
+                            if isinstance(item, dict)
+                            else "medium"
+                        ),
                     }
                 )
 
@@ -196,9 +224,7 @@ class GeminiMatchAnalyzer:
                     requirements.append(
                         {
                             "requirement": requirement,
-
                             "category": "responsibility",
-
                             "importance": item.get(
                                 "importance",
                                 "medium"
@@ -211,15 +237,12 @@ class GeminiMatchAnalyzer:
                 requirements.append(
                     {
                         "requirement": item,
-
                         "category": "responsibility",
-
                         "importance": "medium"
                     }
                 )
 
         return requirements
-
 
     # =========================================================
     # BUILD TECHNOLOGY REQUIREMENTS
@@ -248,9 +271,7 @@ class GeminiMatchAnalyzer:
                     requirements.append(
                         {
                             "requirement": requirement,
-
                             "category": "technology",
-
                             "importance": item.get(
                                 "importance",
                                 "high"
@@ -263,15 +284,12 @@ class GeminiMatchAnalyzer:
                 requirements.append(
                     {
                         "requirement": item,
-
                         "category": "technology",
-
                         "importance": "high"
                     }
                 )
 
         return requirements
-
 
     # =========================================================
     # BUILD PREFERRED REQUIREMENTS
@@ -304,12 +322,10 @@ class GeminiMatchAnalyzer:
                     requirements.append(
                         {
                             "requirement": requirement,
-
                             "category": item.get(
                                 "category",
                                 "preferred"
                             ),
-
                             "importance": item.get(
                                 "importance",
                                 "low"
@@ -322,9 +338,7 @@ class GeminiMatchAnalyzer:
                 requirements.append(
                     {
                         "requirement": item,
-
                         "category": "preferred",
-
                         "importance": "low"
                     }
                 )
@@ -354,9 +368,7 @@ class GeminiMatchAnalyzer:
                     requirements.append(
                         {
                             "requirement": requirement,
-
                             "category": "competency",
-
                             "importance": item.get(
                                 "importance",
                                 "low"
@@ -369,15 +381,12 @@ class GeminiMatchAnalyzer:
                 requirements.append(
                     {
                         "requirement": item,
-
                         "category": "competency",
-
                         "importance": "low"
                     }
                 )
 
         return requirements
-
 
     # =========================================================
     # SEMANTIC MATCHING
@@ -388,7 +397,8 @@ class GeminiMatchAnalyzer:
         candidate_profile: dict,
         required_requirements: list,
         technology_requirements: list,
-        preferred_requirements: list
+        preferred_requirements: list,
+        retrieved_evidence: dict,
     ) -> dict:
 
         prompt = f"""
@@ -400,8 +410,8 @@ requirements using SEMANTIC reasoning.
 You are NOT performing keyword matching.
 
 A candidate may partially satisfy a requirement through related
-experience, equivalent technologies, relevant projects, education,
-or demonstrated work.
+experience, equivalent technologies, relevant projects,
+education, or demonstrated work.
 
 However, similarity does NOT automatically mean equivalence.
 
@@ -476,7 +486,6 @@ Candidate explicitly uses Python professionally.
 
 Score: usually 80-100.
 
-
 INDIRECT:
 
 Candidate has closely related technology experience.
@@ -490,7 +499,6 @@ Candidate has PostgreSQL and general SQL experience.
 Score: usually 30-60.
 
 Do NOT treat related technologies as direct matches.
-
 
 NONE:
 
@@ -554,12 +562,48 @@ For requirements such as:
 
 Be conservative.
 
+Mandatory collaboration, teamwork, communication, or stakeholder
+responsibilities must remain required when they were extracted as
+required responsibilities. Do not downgrade them simply because
+they are behavioral.
+
 Do NOT assume these abilities simply because the candidate
 has professional work experience.
 
 If there is no meaningful evidence:
 
 score should generally be between 0 and 20.
+
+=================================================
+
+RETRIEVED RESUME EVIDENCE
+
+The following evidence was retrieved from the candidate's
+resume using semantic vector search.
+
+Use this evidence as supporting information when evaluating
+requirements.
+
+IMPORTANT:
+
+1. Retrieved evidence is supporting evidence, not automatic proof.
+2. High vector similarity does NOT mean the requirement is satisfied.
+3. Verify experience level, duration, context, and specificity.
+4. Treat explicit minimum/maximum experience requirements as a separate
+   requirement and compare them against the candidate's documented
+   professional experience.
+5. Do NOT infer missing years of experience.
+6. Do NOT infer responsibilities that are not supported.
+6. If retrieved evidence is weak or insufficient, score conservatively.
+7. Evidence must be supported by the candidate profile or retrieved resume evidence.
+8. Do NOT treat vector similarity as the candidate's match score.
+9. A technology appearing in retrieved evidence does not prove the
+   candidate satisfies additional experience requirements associated
+   with that technology.
+10. For example, "Kubernetes" evidence does not prove "five years of
+    production Kubernetes administration."
+
+{json.dumps(retrieved_evidence, indent=2)}
 
 =================================================
 
@@ -599,7 +643,12 @@ Do not omit requirements.
 
 Do not move requirements between groups.
 
-Use evidence ONLY from the candidate profile.
+Use evidence ONLY from the candidate profile or retrieved resume evidence.
+
+When using retrieved evidence, include the actual relevant resume
+content in the "evidence" field.
+
+Do not include vector similarity as the candidate score.
 
 Return ONLY valid JSON.
 
@@ -687,6 +736,25 @@ Return exactly this structure:
                 "Failed to perform semantic job matching"
             ) from error
 
+    @staticmethod
+    def _experience_text(experience_requirement: dict) -> str | None:
+        minimum = experience_requirement.get("minimum_years")
+        maximum = experience_requirement.get("maximum_years")
+        description = experience_requirement.get("description")
+
+        if minimum is not None and maximum is not None:
+            return (
+                f"At least {float(minimum):g} years of experience "
+                f"and no more than {float(maximum):g} years"
+            )
+
+        if minimum is not None:
+            return f"At least {float(minimum):g} years of professional experience"
+
+        if maximum is not None:
+            return f"No more than {float(maximum):g} years of professional experience"
+
+        return str(description).strip() if description else None
 
     # =========================================================
     # NORMALIZE LLM OUTPUT
@@ -752,7 +820,6 @@ Return exactly this structure:
         )
 
         return {
-
             "required_requirements":
             normalized_required,
 
@@ -783,7 +850,6 @@ Return exactly this structure:
                 )
             )
         }
-
 
     # =========================================================
     # NORMALIZE REQUIREMENT GROUP
@@ -990,7 +1056,6 @@ Return exactly this structure:
                 )
 
         return normalized_results
-
 
     # =========================================================
     # RESPONSE PARSER

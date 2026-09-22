@@ -92,8 +92,10 @@ For example, statements like:
 - "takes ownership"
 - "communicates with stakeholders"
 
-should generally be treated as supporting competencies,
-not critical technical requirements.
+may be supporting competencies when they are generic.
+However, if collaboration, stakeholder interaction, teamwork,
+or communication is explicitly stated as a responsibility or
+required qualification, preserve it as a required requirement.
 
 4. Separate requirements into:
 
@@ -308,10 +310,18 @@ RESPONSIBILITIES
 
 Extract only the core responsibilities.
 
+Each distinct responsibility should be a separate item.
+If one bullet contains multiple independent actions, split it
+into separate concise responsibilities when each action can be
+evaluated independently.
+
+Examples:
+- "troubleshoot, debug, and optimize code" -> separate
+  troubleshooting, debugging, and optimization responsibilities.
+- "participate in code reviews, testing, and documentation" ->
+  separate code review, testing, and documentation responsibilities.
+
 Do NOT convert every sentence into a responsibility.
-
-Keep responsibilities concise.
-
 Avoid duplicating skills.
 
 =================================================

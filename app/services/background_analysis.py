@@ -7,6 +7,7 @@ from app.models.resume import Resume
 from app.models.resume_analysis import ResumeAnalysis
 from app.services.job_analysis_service import JobAnalysisService
 from app.services.resume_analysis_service import analyze_resume
+from app.services.embeddings.embedding_manager import EmbeddingManager
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,8 @@ def analyze_resume_background(resume_id):
             resume=resume
         )
 
+        
+
         analysis = (
             db.query(ResumeAnalysis)
             .filter(
@@ -59,6 +62,22 @@ def analyze_resume_background(resume_id):
             .first()
         )
 
+        resume_data = {
+            "skills": analysis.skills or [],
+            "experience": analysis.experience or [],
+            "education": analysis.education or [],
+            "summary": analysis.summary or "",
+        }
+
+        embedding_manager = EmbeddingManager()
+
+        embedding_manager.create_resume_embeddings(
+            db=db,
+            resume_id=resume_id,
+            resume_data=resume_data,
+        )
+
+        
         if analysis:
             analysis.status = "completed"
             db.commit()
@@ -117,42 +136,76 @@ def analyze_job_background(job_id: int):
             )
             return
 
-        analysis = (
-            db.query(JobAnalysis)
-            .filter(
-                JobAnalysis.job_id == job_id
-            )
-            .first()
-        )
+        # ---------------------------------------------
+        # Analyze job description
+        # ---------------------------------------------
 
-        if not analysis:
-            analysis = JobAnalysis(
-                job_id=job_id,
-                status="processing"
-            )
-
-            db.add(analysis)
-            db.commit()
-
-        JobAnalysisService.analyze_job(
+        analysis = JobAnalysisService.analyze_job(
             db=db,
             job_id=job_id
         )
 
-        analysis = (
-            db.query(JobAnalysis)
-            .filter(
-                JobAnalysis.job_id == job_id
+        if not analysis:
+            raise RuntimeError(
+                f"Job analysis was not created for job {job_id}"
             )
-            .first()
+
+        # ---------------------------------------------
+        # Build job data for embeddings
+        # ---------------------------------------------
+
+        job_data = {
+            "required_skills": (
+                analysis.required_skills or []
+            ),
+            "supporting_competencies": (
+                analysis.supporting_competencies or []
+            ),
+            "preferred_skills": (
+                analysis.preferred_skills or []
+            ),
+            "technologies": (
+                analysis.technologies or []
+            ),
+            "experience_requirement": (
+                analysis.experience_requirement or {}
+            ),
+            "education_requirements": (
+                analysis.education_requirements or []
+            ),
+            "responsibilities": (
+                analysis.responsibilities or []
+            ),
+            "key_keywords": (
+                analysis.key_keywords or []
+            ),
+            "summary": (
+                analysis.summary or ""
+            ),
+        }
+
+        # ---------------------------------------------
+        # Create job embeddings
+        # ---------------------------------------------
+
+        embedding_manager = EmbeddingManager()
+
+        embedding_manager.create_job_embeddings(
+            db=db,
+            job_id=job_id,
+            job_data=job_data,
         )
 
-        if analysis:
-            analysis.status = "completed"
-            db.commit()
+        # ---------------------------------------------
+        # Mark analysis as completed
+        # ---------------------------------------------
+
+        analysis.status = "completed"
+
+        db.commit()
 
         logger.info(
-            "Job analysis completed: %s",
+            "Job analysis and embeddings completed: %s",
             job_id
         )
 
@@ -174,6 +227,7 @@ def analyze_job_background(job_id: int):
 
         except Exception:
             db.rollback()
+
             logger.exception(
                 "Failed to update job analysis status: %s",
                 job_id

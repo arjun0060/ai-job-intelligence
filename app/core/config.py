@@ -21,8 +21,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-print("DB USER:", settings.POSTGRES_USER)
-print("DB NAME:", settings.POSTGRES_DB)
-print("DB HOST:", settings.POSTGRES_HOST)
-print("DB PORT:", settings.POSTGRES_PORT)

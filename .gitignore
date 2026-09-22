@@ -14,6 +14,7 @@ uploads/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/.env
 
 # IDE
 .vscode/
@@ -22,3 +23,19 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+#
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!terraform.tfvars.example
+
+# Terraform override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

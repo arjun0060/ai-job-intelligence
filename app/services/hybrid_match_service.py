@@ -124,6 +124,8 @@ class HybridMatchService:
         analyzer = MatchAnalyzer()
 
         analysis_result = analyzer.analyze(
+            db=db,
+            resume_id=resume_id,
             resume_data=resume_data,
             job_data=job_data,
         )

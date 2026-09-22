@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 
 import {
   uploadResume,
@@ -21,6 +20,7 @@ function Home() {
   const [job, setJob] = useState(null);
 
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(null);
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
 
@@ -59,12 +59,16 @@ function Home() {
         }
 
         if (data.resume_status === "failed") {
-          setError("Resume analysis failed. Please upload the resume again.");
+          setError(
+            "Resume analysis failed. Please upload the resume again."
+          );
           return;
         }
 
         if (data.job_status === "failed") {
-          setError("Job analysis failed. Please extract the job again.");
+          setError(
+            "Job analysis failed. Please extract the job again."
+          );
           return;
         }
 
@@ -85,16 +89,18 @@ function Home() {
     };
   }, [resume?.id, job?.id]);
 
+  const showError = (message) => {
+    setError(message);
+  };
+
   const handleResumeSelect = (event) => {
     const selectedId = event.target.value;
 
     if (!selectedId) {
       setResume(null);
-      setJob(null);
-      setJobUrl("");
+      setResumeFile(null);
       setAnalysisStatus(null);
-      setStep(1);
-      setError("");
+      setStep(job ? 2 : 1);
       return;
     }
 
@@ -106,21 +112,18 @@ function Home() {
 
     setResume(selectedResume);
     setResumeFile(null);
-    setJob(null);
-    setJobUrl("");
     setAnalysisStatus(null);
-    setStep(2);
-    setError("");
+    setStep(job ? 3 : 2);
   };
 
   const handleResumeUpload = async () => {
     if (!resumeFile) {
-      setError("Please select a PDF resume.");
+      showError("Please select a PDF resume.");
       return;
     }
 
     setLoading(true);
-    setError("");
+    setLoadingStep("resume");
 
     try {
       const data = await uploadResume(resumeFile);
@@ -134,80 +137,125 @@ function Home() {
       });
       setResumeFile(null);
       setAnalysisStatus(null);
-      setJob(null);
-      setJobUrl("");
-      setStep(2);
+      setStep(job ? 3 : 2);
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          "Failed to upload resume."
+      showError(
+        err.response?.data?.detail || "Failed to upload resume."
       );
     } finally {
       setLoading(false);
+      setLoadingStep(null);
     }
   };
 
   const handleJobExtraction = async () => {
     if (!jobUrl.trim()) {
-      setError("Please enter a job URL.");
+      showError("Please enter a job URL.");
       return;
     }
 
     setLoading(true);
-    setError("");
+    setLoadingStep("job");
 
     try {
       const data = await extractJob(jobUrl);
 
       setJob(data);
       setAnalysisStatus(null);
-      setStep(3);
+      setStep(resume ? 3 : 2);
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          "Failed to extract job."
+      showError(
+        err.response?.data?.detail || "Failed to extract job."
       );
     } finally {
       setLoading(false);
+      setLoadingStep(null);
     }
   };
 
   const handleMatchAnalysis = async () => {
     if (!resume?.id || !job?.id) {
-      setError("Resume or job information is missing.");
+      showError("Please provide both a resume and a job before analyzing.");
+      return;
+    }
+
+    if (!analysisStatus?.ready) {
+      showError(
+        "Resume and job analysis are still being prepared. Please wait a moment."
+      );
       return;
     }
 
     setLoading(true);
-    setError("");
+    setLoadingStep("match");
 
     try {
-      const match = await analyzeMatch(
-        resume.id,
-        job.id
-      );
-
+      const match = await analyzeMatch(resume.id, job.id);
       navigate(`/matches/${match.id}`);
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          "Failed to analyze match."
+      showError(
+        err.response?.data?.detail || "Failed to analyze match."
       );
     } finally {
       setLoading(false);
+      setLoadingStep(null);
     }
   };
 
-    useEffect(() => {
+  useEffect(() => {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
-        navigate("/login");
+      navigate("/login");
     }
-    }, [navigate]);
+  }, [navigate]);
+
+  const hasResume = Boolean(resume?.id);
+  const hasJob = Boolean(job?.id);
+  const bothReady = hasResume && hasJob && analysisStatus?.ready;
+
+  const analysisPreparationMessage = () => {
+    if (!hasResume && !hasJob) {
+      return "Upload or select a resume and extract a job to begin analysis.";
+    }
+
+    if (!hasResume) {
+      return "Add a resume to prepare the match analysis.";
+    }
+
+    if (!hasJob) {
+      return "Extract a job posting to prepare the match analysis.";
+    }
+
+    if (analysisStatus?.resume_status === "processing") {
+      return "Preparing your resume...";
+    }
+
+    if (analysisStatus?.job_status === "processing") {
+      return "Preparing the job description...";
+    }
+
+    return "Preparing your match...";
+  };
+
+  const analysisButtonLabel = () => {
+    if (loadingStep === "match") return "Analyzing...";
+    if (bothReady) return "Analyze Match";
+    if (!hasResume && !hasJob) return "Select Resume & Job";
+    if (!hasResume) return "Add Resume First";
+    if (!hasJob) return "Extract Job First";
+    return "Preparing Analysis...";
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {error && (
+        <ErrorModal
+          message={error}
+          onClose={() => setError("")}
+        />
+      )}
+
       {/* Header */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
@@ -224,9 +272,7 @@ function Home() {
           {resume && (
             <button
               onClick={() =>
-                navigate(
-                  `/resumes/${resume.id}/matches`
-                )
+                navigate(`/resumes/${resume.id}/matches`)
               }
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
@@ -236,11 +282,11 @@ function Home() {
 
           <button
             onClick={() => {
-                localStorage.removeItem("access_token");
-                navigate("/login");
+              localStorage.removeItem("access_token");
+              navigate("/login");
             }}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+          >
             Logout
           </button>
         </div>
@@ -254,37 +300,26 @@ function Home() {
           </h2>
 
           <p className="mx-auto mt-3 max-w-2xl text-slate-500">
-            Upload your resume, provide a job posting, and
-            let the system analyze your requirements,
-            technologies, strengths, and gaps.
+            Upload your resume and provide a job posting in either order,
+            then let the system analyze your requirements, technologies,
+            strengths, and gaps.
           </p>
         </div>
 
         {/* Progress */}
         <div className="mb-8 flex items-center justify-center gap-3">
-          <Step number="1" label="Resume" active={step >= 1} />
+          <Step number="1" label="Resume" active={hasResume} />
           <div className="h-px w-12 bg-slate-300" />
-          <Step number="2" label="Job" active={step >= 2} />
+          <Step number="2" label="Job" active={hasJob} />
           <div className="h-px w-12 bg-slate-300" />
-          <Step
-            number="3"
-            label="Analyze"
-            active={step >= 3}
-          />
+          <Step number="3" label="Analyze" active={Boolean(bothReady)} />
         </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
 
         {/* Resume */}
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5">
             <p className="text-sm font-semibold text-indigo-600">
-              STEP 1
+              RESUME
             </p>
 
             <h3 className="mt-1 text-xl font-semibold text-slate-900">
@@ -292,7 +327,8 @@ function Home() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Select a previous resume or upload a new PDF.
+              Select a previous resume or upload a new PDF. You can do this
+              before or after extracting the job.
             </p>
           </div>
 
@@ -324,17 +360,12 @@ function Home() {
               accept=".pdf,application/pdf"
               className="hidden"
               onChange={(event) => {
-                setResumeFile(
-                  event.target.files?.[0] || null
-                );
-                setError("");
+                setResumeFile(event.target.files?.[0] || null);
               }}
             />
 
             <span className="text-sm font-medium text-slate-700">
-              {resumeFile
-                ? resumeFile.name
-                : "Click to select a PDF"}
+              {resumeFile ? resumeFile.name : "Click to select a PDF"}
             </span>
 
             <span className="mt-1 text-xs text-slate-400">
@@ -347,9 +378,7 @@ function Home() {
             disabled={loading || !resumeFile}
             className="mt-5 w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading && step === 1
-              ? "Uploading..."
-              : "Upload Resume"}
+            {loadingStep === "resume" ? "Uploading..." : "Upload Resume"}
           </button>
 
           {resume && (
@@ -366,14 +395,10 @@ function Home() {
         </section>
 
         {/* Job */}
-        <section
-          className={`mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm ${
-            !resume ? "opacity-50" : ""
-          }`}
-        >
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5">
             <p className="text-sm font-semibold text-indigo-600">
-              STEP 2
+              JOB
             </p>
 
             <h3 className="mt-1 text-xl font-semibold text-slate-900">
@@ -381,17 +406,17 @@ function Home() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Paste the URL of the job you want to analyze.
+              Paste the URL of the job you want to analyze. This can be done
+              before or after selecting a resume.
             </p>
           </div>
 
           <input
             type="url"
             value={jobUrl}
-            disabled={!resume}
+            disabled={loading}
             onChange={(event) => {
               setJobUrl(event.target.value);
-              setError("");
             }}
             placeholder="https://example.com/jobs/software-engineer"
             className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-100"
@@ -399,12 +424,10 @@ function Home() {
 
           <button
             onClick={handleJobExtraction}
-            disabled={loading || !resume || !jobUrl.trim()}
+            disabled={loading || !jobUrl.trim()}
             className="mt-5 w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading && step === 2
-              ? "Extracting Job..."
-              : "Extract Job"}
+            {loadingStep === "job" ? "Extracting Job..." : "Extract Job"}
           </button>
 
           {job && (
@@ -429,14 +452,10 @@ function Home() {
         </section>
 
         {/* Analysis */}
-        <section
-          className={`mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm ${
-            !job ? "opacity-50" : ""
-          }`}
-        >
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5">
             <p className="text-sm font-semibold text-indigo-600">
-              STEP 3
+              ANALYSIS
             </p>
 
             <h3 className="mt-1 text-xl font-semibold text-slate-900">
@@ -444,38 +463,66 @@ function Home() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Compare your resume against the job
+              Once both items are ready, compare your resume against the job
               requirements.
             </p>
           </div>
 
-          {job && analysisStatus && !analysisStatus.ready && (
-            <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
-              {analysisStatus.resume_status === "processing"
-                ? "Preparing your resume..."
-                : analysisStatus.job_status === "processing"
-                  ? "Preparing the job description..."
-                  : "Preparing your match..."}
+          {!bothReady && (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              {analysisPreparationMessage()}
             </div>
           )}
 
           <button
             onClick={handleMatchAnalysis}
-            disabled={
-              loading ||
-              !job ||
-              !analysisStatus?.ready
-            }
+            disabled={loading || !bothReady}
             className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading && step === 3
-              ? "Analyzing..."
-              : analysisStatus?.ready
-                ? "Analyze Match"
-                : "Preparing Analysis..."}
+            {analysisButtonLabel()}
           </button>
         </section>
       </main>
+    </div>
+  );
+}
+
+function ErrorModal({ message, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="error-dialog-title"
+        className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-6 shadow-2xl"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+            !
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h2
+              id="error-dialog-title"
+              className="text-lg font-semibold text-slate-900"
+            >
+              Something went wrong
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {message}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          autoFocus
+          className="mt-6 w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+        >
+          Close
+        </button>
+      </div>
     </div>
   );
 }
