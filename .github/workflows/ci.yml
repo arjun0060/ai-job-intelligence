@@ -25,6 +25,24 @@ jobs:
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
       GEMINI_API_KEY: test-gemini-key
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U test_user -d test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,9 +58,12 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: Run database migrations
+        run: alembic upgrade head
+
       - name: Run tests
         run: pytest -q
-        
+
   frontend:
     name: Frontend Build
     runs-on: ubuntu-latest
