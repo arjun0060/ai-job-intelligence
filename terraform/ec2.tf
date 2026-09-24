@@ -25,7 +25,7 @@ resource "aws_instance" "app" {
 
   root_block_device {
     volume_type = "gp3"
-    volume_size = 8
+    volume_size = 20
     encrypted   = true
   }
 

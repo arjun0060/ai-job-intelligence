@@ -2,10 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.resume import Resume
 from app.models.resume_analysis import ResumeAnalysis
-
-from app.services.ai.gemini_resume_analyzer import (
-    GeminiResumeAnalyzer
-)
+from app.services.ai.resume_analyzer import ResumeAnalyzer
 
 
 def analyze_resume(
@@ -13,10 +10,10 @@ def analyze_resume(
     resume: Resume
 ) -> ResumeAnalysis:
 
-    analyzer = GeminiResumeAnalyzer()
+    analyzer = ResumeAnalyzer()
 
     result = analyzer.analyze(
-        resume.extracted_text
+        resume_text=resume.extracted_text
     )
 
     existing_analysis = (
@@ -49,39 +46,31 @@ def analyze_resume(
         )
 
         db.commit()
-
         db.refresh(existing_analysis)
 
         return existing_analysis
 
     analysis = ResumeAnalysis(
-
         resume_id=resume.id,
-
         skills=result.get(
             "skills",
             []
         ),
-
         experience=result.get(
             "experience",
             []
         ),
-
         education=result.get(
             "education",
             []
         ),
-
         summary=result.get(
             "summary"
         )
     )
 
     db.add(analysis)
-
     db.commit()
-
     db.refresh(analysis)
 
     return analysis

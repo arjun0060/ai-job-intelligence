@@ -12,19 +12,21 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "FastAPI"
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.admin_cidr]
+  }
+
+  ingress {
+    description = "SSH from EC2 Instance Connect"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    prefix_list_ids = [
+      data.aws_ec2_managed_prefix_list.ec2_instance_connect.id
+    ]
   }
 
   egress {
