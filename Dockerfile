@@ -11,6 +11,13 @@ RUN pip install \
     --no-cache-dir \
     --default-timeout=300 \
     --retries 5 \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.14.0+cpu
+
+RUN pip install \
+    --no-cache-dir \
+    --default-timeout=300 \
+    --retries 5 \
     -r requirements.docker.txt
 
 RUN playwright install --with-deps chromium

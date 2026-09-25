@@ -35,5 +35,4 @@ tokenizers==0.23.2
 safetensors==0.8.0
 tqdm==4.70.1
 
-torch==2.14.0
 playwright==1.62.0

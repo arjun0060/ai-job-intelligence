@@ -1,0 +1,26 @@
+services:
+  backend:
+    image: ai-job-intelligence-backend
+    container_name: ai-job-intelligence-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    networks:
+      - app_network
+
+  frontend:
+    image: ai-job-intelligence-frontend
+    container_name: ai-job-intelligence-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
