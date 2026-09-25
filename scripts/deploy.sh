@@ -8,6 +8,8 @@ echo "Starting deployment..."
 
 cd "$APP_DIR"
 
+git config --global --add safe.directory "$APP_DIR"
+
 echo "Fetching latest code..."
 git fetch origin main
 
