@@ -8,13 +8,11 @@ echo "Starting deployment..."
 
 cd "$APP_DIR"
 
-git config --global --add safe.directory "$APP_DIR"
-
 echo "Fetching latest code..."
-git fetch origin main
+git -c safe.directory="$APP_DIR" fetch origin main
 
 echo "Resetting to latest main..."
-git reset --hard origin/main
+git -c safe.directory="$APP_DIR" reset --hard origin/main
 
 echo "Building backend image..."
 docker build -t ai-job-intelligence-backend .
