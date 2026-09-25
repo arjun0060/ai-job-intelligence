@@ -2,7 +2,7 @@
 
 set -e
 
-APP_DIR="$HOME/ai-job-intelligence"
+APP_DIR="/home/ubuntu/ai-job-intelligence"
 
 echo "Starting deployment..."
 
