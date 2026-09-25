@@ -35,7 +35,7 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["cd ~/ai-job-intelligence && bash scripts/deploy.sh"]' \
+            --parameters 'commands=["cd /home/ubuntu/ai-job-intelligence && bash scripts/deploy.sh"]' \
             --query "Command.CommandId" \
             --output text)
 
