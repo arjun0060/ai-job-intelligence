@@ -40,4 +40,54 @@ resource "aws_iam_role" "github_actions" {
   tags = {
     Name = "${var.project_name}-github-actions"
   }
+  
+}
+
+resource "aws_iam_policy" "github_actions_deploy" {
+  name = "ai-job-intelligence-github-actions-deploy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:SendCommand"
+        ]
+
+        Resource = [
+          "arn:aws:ssm:ap-south-1::document/AWS-RunShellScript"
+        ]
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:SendCommand"
+        ]
+
+        Resource = [
+          "arn:aws:ec2:ap-south-1:253388243708:instance/i-0b84b5c066c3db301"
+        ]
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:GetCommandInvocation",
+          "ssm:ListCommandInvocations",
+          "ssm:ListCommands"
+        ]
+
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_deploy" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_deploy.arn
 }
